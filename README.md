@@ -86,7 +86,3 @@ Gene lookup is case-insensitive, so `cd3d`, `Cd3d`, and `CD3D` resolve to the sa
 ## Interpretation note
 
 UMAP separation alone does not establish a novel cell type. Marker programs, quality metrics, possible doublets, comparisons with neighboring clusters, independent replication, and experimental validation are required before making a novelty claim. The current exploratory conclusion is to investigate further rather than declare a novel cell type.
-
-## Privacy and secrets
-
-Do not commit `.env` files, API keys, credentials, or other secrets. These are excluded through `.gitignore` where applicable.
