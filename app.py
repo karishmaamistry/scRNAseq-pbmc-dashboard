@@ -12,7 +12,10 @@ DATA = ROOT / "data_archive" / "data" / "pbmc3k.h5ad"
 # Loaded exactly once at startup/import; request handlers reuse this object.
 AD = sc.read_h5ad(DATA)
 GENES = list(AD.var_names.astype(str))
+GENE_LOOKUP = {gene.casefold(): gene for gene in GENES}
 CLUSTER_KEY = "leiden"
+CLUSTERS = [str(x) for x in AD.obs[CLUSTER_KEY].cat.categories]
+MARKERS = {}
 
 app = FastAPI(title="PBMC Cluster Explorer")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
@@ -29,9 +32,8 @@ def resolve_gene(gene: str) -> str:
     exact = {str(name): str(name) for name in AD.var_names}
     if requested in exact:
         return exact[requested]
-    folded = {str(name).casefold(): str(name) for name in AD.var_names}
-    if requested.casefold() in folded:
-        return folded[requested.casefold()]
+    if requested.casefold() in GENE_LOOKUP:
+        return GENE_LOOKUP[requested.casefold()]
     raise HTTPException(404, f"Unknown gene: {gene}")
 
 
@@ -52,7 +54,7 @@ def index():
 def meta():
     return {
         "cells": int(AD.n_obs), "genes": int(AD.n_vars),
-        "clusters": [str(x) for x in AD.obs[CLUSTER_KEY].cat.categories],
+        "clusters": CLUSTERS,
         "obs": list(AD.obs.columns), "var": list(AD.var.columns),
         "obsm": list(AD.obsm.keys()), "layers": list(AD.layers.keys()),
     }
@@ -76,21 +78,28 @@ def expression(gene: str):
     return {"gene": resolved, "points": [{"x": float(x), "y": float(y), "value": float(v), "cluster": str(c)} for (x, y), v, c in zip(coords, values, AD.obs[CLUSTER_KEY])]}
 
 
-@app.get("/api/markers/{cluster}")
-def markers(cluster: str, n: int = 20):
-    if cluster not in set(AD.obs[CLUSTER_KEY].astype(str)):
-        raise HTTPException(404, "Unknown cluster")
+def build_markers():
     tmp = AD.copy()
     tmp.obs[CLUSTER_KEY] = tmp.obs[CLUSTER_KEY].astype(str).astype("category")
-    sc.tl.rank_genes_groups(tmp, groupby=CLUSTER_KEY, groups=[cluster], reference="rest", method="wilcoxon", n_genes=min(n, AD.n_vars), key_added="api_markers")
-    r = tmp.uns["api_markers"]
-    names = r["names"][cluster]
-    scores = r["scores"][cluster]
-    pvals = r["pvals_adj"][cluster]
-    vals = matrix_column(str(names[0])) if len(names) else np.array([])
-    rows = []
-    mask = AD.obs[CLUSTER_KEY].astype(str).to_numpy() == cluster
-    for gene, score, pval in zip(names, scores, pvals):
-        expr = matrix_column(str(gene))
-        rows.append({"gene": str(gene), "score": float(score), "p_adj": float(pval), "fraction": float(np.mean(expr[mask] > 0)), "mean_cluster": float(np.mean(expr[mask])), "mean_rest": float(np.mean(expr[~mask]))})
-    return {"cluster": cluster, "markers": rows}
+    sc.tl.rank_genes_groups(tmp, groupby=CLUSTER_KEY, reference="rest", method="wilcoxon", n_genes=20, key_added="startup_markers")
+    ranked = tmp.uns["startup_markers"]
+    for cluster in CLUSTERS:
+        names = ranked["names"][cluster]
+        scores = ranked["scores"][cluster]
+        pvals = ranked["pvals_adj"][cluster]
+        mask = AD.obs[CLUSTER_KEY].astype(str).to_numpy() == cluster
+        rows = []
+        for gene, score, pval in zip(names, scores, pvals):
+            expr = matrix_column(str(gene))
+            rows.append({"gene": str(gene), "score": float(score), "p_adj": float(pval), "fraction": float(np.mean(expr[mask] > 0)), "mean_cluster": float(np.mean(expr[mask])), "mean_rest": float(np.mean(expr[~mask]))})
+        MARKERS[cluster] = rows
+
+
+build_markers()
+
+
+@app.get("/api/markers/{cluster}")
+def markers(cluster: str):
+    if cluster not in MARKERS:
+        raise HTTPException(404, "Unknown cluster")
+    return {"cluster": cluster, "markers": MARKERS[cluster]}
