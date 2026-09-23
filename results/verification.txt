@@ -1,0 +1,13 @@
+shape: (2700, 13714)
+clusters: ['0', '1', '2', '3', '4', '5', '6', '7']
+umap shape: (2700, 2)
+cluster 4 cells: 163
+cluster 4 top genes: ['LST1', 'FCER1G', 'FCGR3A', 'COTL1', 'AIF1', 'IFITM2', 'IFITM3', 'FTH1', 'SAT1', 'SERPINA1']
+  LST1: fraction=1.000000, mean_cluster=3.827455
+  FCER1G: fraction=1.000000, mean_cluster=3.605386
+  FCGR3A: fraction=0.975460, mean_cluster=2.865753
+cluster 7 cells: 10
+cluster 7 top genes: ['ACTG1', 'CFL1', 'GAPDH', 'KIAA0101', 'SLC25A5', 'STMN1', 'ACTB', 'FABP5', 'H2AFV', 'PFN1']
+  ACTG1: fraction=1.000000, mean_cluster=3.996978
+  CFL1: fraction=1.000000, mean_cluster=3.693501
+  GAPDH: fraction=1.000000, mean_cluster=4.115803

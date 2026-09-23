@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>PBMC Cluster Explorer</title><script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script></head>
+<body class="bg-slate-950 text-slate-100"><main class="max-w-7xl mx-auto p-6"><h1 class="text-3xl font-bold">PBMC Cluster Explorer</h1><p class="text-slate-400 mt-1">Explore the precomputed UMAP, expression, markers, and quality metrics.</p>
+<section id="meta" class="grid grid-cols-2 md:grid-cols-6 gap-3 my-5"></section>
+<div class="flex gap-3 mb-4"><select id="cluster" class="bg-slate-800 p-2 rounded"><option value="">All clusters</option></select><input id="gene" list="genes" placeholder="Gene (e.g. CD3D)" class="bg-slate-800 p-2 rounded"><datalist id="genes"></datalist><button onclick="showGene()" class="bg-blue-600 px-4 rounded">Expression</button><button onclick="showUMAP()" class="bg-slate-700 px-4 rounded">Clusters</button></div>
+<div id="plot" class="bg-slate-900 rounded"></div><section class="mt-6"><h2 class="text-xl font-semibold mb-2">Top markers</h2><div class="flex gap-2 mb-2"><select id="markerCluster" class="bg-slate-800 p-2 rounded"></select><button onclick="loadMarkers()" class="bg-blue-600 px-3 rounded">Load</button></div><div class="overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400"><th>Gene</th><th>Score</th><th>Adjusted p</th><th>Detection fraction</th><th>Mean cluster</th><th>Mean rest</th></tr></thead><tbody id="markers"></tbody></table></div></section></main>
+<script>
+let clusters=[];
+async function get(u){return (await fetch(u)).json()}
+function card(k,v){return `<div class="bg-slate-900 rounded p-3"><div class="text-slate-400 text-xs">${k}</div><div class="text-xl font-semibold">${v}</div></div>`}
+async function init(){let m=await get('/api/meta'); clusters=m.clusters; document.getElementById('meta').innerHTML=card('Cells',m.cells)+card('Genes',m.genes)+card('Clusters',clusters.length)+card('UMAP',m.obsm.includes('X_umap')?'available':'missing')+card('Obs fields',m.obs.length)+card('Layers',m.layers.join(', ')); for(let id of ['cluster','markerCluster']) for(let c of clusters) document.getElementById(id).insertAdjacentHTML('beforeend',`<option>${c}</option>`); showUMAP(); loadMarkers();}
+function plot(points, title, color){Plotly.react('plot',[{x:points.map(p=>p.x),y:points.map(p=>p.y),mode:'markers',type:'scattergl',text:points.map(p=>'cluster '+p.cluster),marker:{size:6,color:color||points.map(p=>p.cluster),colorscale:'Viridis',showscale:!!color,colorbar:{title:color?'expression':'cluster'}}}],{title,template:'plotly_dark',paper_bgcolor:'#0f172a',plot_bgcolor:'#0f172a',xaxis:{title:'UMAP 1'},yaxis:{title:'UMAP 2'}})}
+async function showUMAP(){let c=document.getElementById('cluster').value; let d=await get('/api/umap'+(c?'?cluster='+c:'')); plot(d.points,'UMAP colored by cluster')}
+async function showGene(){let g=document.getElementById('gene').value.trim();if(!g)return;let d=await get('/api/expression/'+encodeURIComponent(g));plot(d.points,g+' expression',d.points.map(p=>p.value))}
+async function loadMarkers(){let c=document.getElementById('markerCluster').value;let d=await get('/api/markers/'+c);document.getElementById('markers').innerHTML=d.markers.map(r=>`<tr class="border-t border-slate-800"><td>${r.gene}</td><td>${r.score.toFixed(3)}</td><td>${r.p_adj.toExponential(2)}</td><td>${r.fraction.toFixed(3)}</td><td>${r.mean_cluster.toFixed(3)}</td><td>${r.mean_rest.toFixed(3)}</td></tr>`).join('')}
+init();
+</script></body></html>
