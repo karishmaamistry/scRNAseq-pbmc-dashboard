@@ -1,0 +1,6 @@
+scanpy
+anndata
+fastapi
+uvicorn[standard]
+plotly
+python-multipart
