@@ -24,9 +24,19 @@ def jsonable(value):
     return value
 
 
+def resolve_gene(gene: str) -> str:
+    requested = gene.strip()
+    exact = {str(name): str(name) for name in AD.var_names}
+    if requested in exact:
+        return exact[requested]
+    folded = {str(name).casefold(): str(name) for name in AD.var_names}
+    if requested.casefold() in folded:
+        return folded[requested.casefold()]
+    raise HTTPException(404, f"Unknown gene: {gene}")
+
+
 def matrix_column(gene: str):
-    if gene not in AD.var_names:
-        raise HTTPException(404, f"Unknown gene: {gene}")
+    gene = resolve_gene(gene)
     x = AD[:, gene].X
     if hasattr(x, "toarray"):
         x = x.toarray()
@@ -60,9 +70,10 @@ def umap(cluster: Optional[str] = None):
 
 @app.get("/api/expression/{gene}")
 def expression(gene: str):
-    values = matrix_column(gene)
+    resolved = resolve_gene(gene)
+    values = matrix_column(resolved)
     coords = np.asarray(AD.obsm["X_umap"])
-    return {"gene": gene, "points": [{"x": float(x), "y": float(y), "value": float(v), "cluster": str(c)} for (x, y), v, c in zip(coords, values, AD.obs[CLUSTER_KEY])]}
+    return {"gene": resolved, "points": [{"x": float(x), "y": float(y), "value": float(v), "cluster": str(c)} for (x, y), v, c in zip(coords, values, AD.obs[CLUSTER_KEY])]}
 
 
 @app.get("/api/markers/{cluster}")
