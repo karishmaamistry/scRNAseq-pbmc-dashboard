@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+# Keep large single-cell files out of Git; the current file is 39,023,720 bytes (<100 MB).
+*.h5ad
